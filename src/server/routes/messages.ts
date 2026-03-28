@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { authMiddleware } from '../middleware/auth.js';
 import * as messageService from '../services/message.js';
 import * as conversationService from '../services/conversation.js';
+import * as workspaceService from '../services/workspace.js';
+import { getConversationQueue } from '../agent/singleton.js';
 
 const messages = new Hono();
 
@@ -51,7 +53,24 @@ messages.post('/:conversationId/messages', async (c) => {
     metadata
   );
 
-  // TODO: In Phase 2, this will trigger agent execution via ConversationQueue
+  // Trigger agent execution via ConversationQueue
+  const queue = getConversationQueue();
+  if (queue) {
+    const workspace = workspaceService.getWorkspaceById(conversation.workspace_id);
+    if (workspace) {
+      queue.enqueue({
+        conversationId,
+        workspaceId: conversation.workspace_id,
+        workspaceFolder: workspace.path,
+        content: body.content.trim(),
+        sessionId: conversation.session_id || undefined,
+        images: body.images,
+      }).catch((err) => {
+        // Non-blocking: agent spawn failure is handled via WS
+        console.error('Queue enqueue error:', err);
+      });
+    }
+  }
 
   return c.json(message, 201);
 });

@@ -5,6 +5,7 @@ import { loadConfig } from './config.js';
 import { createLogger, setLogger } from './logger.js';
 import { initDb } from './db/index.js';
 import { setupWebSocket } from './ws/index.js';
+import { initAgentPipeline } from './agent/singleton.js';
 
 // Routes
 import healthRoutes from './routes/health.js';
@@ -22,6 +23,13 @@ setLogger(logger);
 
 // Initialize database
 initDb(config.databasePath);
+
+// Initialize agent pipeline
+const { agentManager } = initAgentPipeline(config);
+logger.info(
+  { mode: config.agentMode, maxConcurrent: config.maxConcurrentAgents },
+  'Agent pipeline initialized'
+);
 
 // Create Hono app
 const app = new Hono();
@@ -54,6 +62,19 @@ const server = serve({
 
 // Setup WebSocket on the same server
 setupWebSocket(server as any);
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  logger.info('SIGTERM received, shutting down...');
+  agentManager.killAll();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  logger.info('SIGINT received, shutting down...');
+  agentManager.killAll();
+  process.exit(0);
+});
 
 logger.info({ port: config.port }, 'HaydenClaw server started');
 
