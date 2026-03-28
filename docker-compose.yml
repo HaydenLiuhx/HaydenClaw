@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: haydenclaw-server
+    ports:
+      - "${PORT:-3000}:3000"
+    volumes:
+      - haydenclaw-data:/data
+      - /var/run/docker.sock:/var/run/docker.sock  # For spawning agent containers
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - JWT_SECRET=${JWT_SECRET}
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - AGENT_MODE=${AGENT_MODE:-process}
+      - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-2}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DATABASE_PATH=/data/db/haydenclaw.db
+      - IPC_BASE_DIR=/data/ipc
+      - WORKSPACE_BASE_DIR=/data/workspaces
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2g
+        reservations:
+          cpus: '0.5'
+          memory: 512m
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  haydenclaw-data:
+    driver: local

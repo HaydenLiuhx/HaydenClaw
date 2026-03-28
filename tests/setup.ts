@@ -12,6 +12,10 @@ beforeAll(() => {
 });
 
 afterAll(() => {
-  // Clean up test data
-  fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+  // Clean up test data - use try/catch to avoid race conditions
+  try {
+    fs.rmSync(TEST_DATA_DIR, { recursive: true, force: true });
+  } catch {
+    // Ignore cleanup errors
+  }
 });
