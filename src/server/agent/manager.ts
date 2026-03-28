@@ -111,12 +111,20 @@ export class AgentManager {
     const scriptPath = this.agentScriptPath || path.resolve('src/agent/runner.ts');
     const runner = scriptPath.endsWith('.ts') ? 'tsx' : 'node';
 
+    // Build environment: inherit full parent env (for OAuth/keychain access),
+    // then overlay agent-specific vars. If ANTHROPIC_API_KEY is set, use it;
+    // otherwise the SDK will use OAuth credentials from ~/.claude/
+    const env: Record<string, string> = {
+      ...process.env as Record<string, string>,
+      ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'sonnet',
+    };
+
+    if (this.anthropicApiKey && this.anthropicApiKey !== 'oauth') {
+      env.ANTHROPIC_API_KEY = this.anthropicApiKey;
+    }
+
     return spawn(runner, [scriptPath], {
-      env: {
-        ...process.env,
-        ANTHROPIC_API_KEY: this.anthropicApiKey,
-        ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL || 'sonnet',
-      },
+      env,
       stdio: ['pipe', 'pipe', 'pipe'],
       cwd: options.workspaceFolder,
     });

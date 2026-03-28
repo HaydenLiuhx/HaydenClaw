@@ -6,7 +6,7 @@ const configSchema = z.object({
   databasePath: z.string().default('./data/db/haydenclaw.db'),
   ipcBaseDir: z.string().default('./data/ipc'),
   workspaceBaseDir: z.string().default('./data/workspaces'),
-  anthropicApiKey: z.string().min(1, 'ANTHROPIC_API_KEY is required'),
+  anthropicApiKey: z.string().default('oauth'), // 'oauth' = use Claude subscription via inherited env
   jwtSecret: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
   feishuAppId: z.string().optional(),
   feishuAppSecret: z.string().optional(),
@@ -42,7 +42,7 @@ export function loadConfig(): Config {
 /**
  * Create a config from explicit values (useful for testing).
  */
-export function createConfig(overrides: Partial<Config> & Pick<Config, 'anthropicApiKey' | 'jwtSecret'>): Config {
+export function createConfig(overrides: Partial<Config> & Pick<Config, 'jwtSecret'> & { anthropicApiKey?: string }): Config {
   _config = configSchema.parse(overrides);
   return _config;
 }
