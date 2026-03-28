@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+/* Markdown code blocks */
+pre code {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+/* Thinking block */
+.thinking-block {
+  border-left: 3px solid #9ca3af;
+  padding-left: 0.75rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+/* Tool call block */
+.tool-block {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f9fafb;
+  font-size: 0.875rem;
+}

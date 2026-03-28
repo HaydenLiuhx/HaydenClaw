@@ -4,6 +4,10 @@ import type { Server } from 'node:http';
 import jwt from 'jsonwebtoken';
 import { loadConfig } from '../config.js';
 import { getLogger } from '../logger.js';
+import { getConversationQueue } from '../agent/singleton.js';
+import * as conversationService from '../services/conversation.js';
+import * as messageService from '../services/message.js';
+import * as workspaceService from '../services/workspace.js';
 import type { WsClient, WsClientEvent, WsServerEvent } from './types.js';
 import type { StreamEvent } from '../../shared/types.js';
 
@@ -69,21 +73,61 @@ export function setupWebSocket(server: Server): WebSocketServer {
 function handleClientEvent(ws: WebSocket, event: WsClientEvent): void {
   const client = clients.get(ws);
   if (!client) return;
+  const logger = getLogger();
 
   switch (event.type) {
     case 'ping':
       sendToClient(ws, { type: 'pong' });
       break;
-    // Subscribe/unsubscribe will be handled when we implement the message type
-    // For now, any message with a conversationId auto-subscribes
-    case 'message':
-    case 'interrupt':
-    case 'drain':
-    case 'close':
-      if ('conversationId' in event) {
-        client.subscriptions.add(event.conversationId);
+
+    case 'message': {
+      // Auto-subscribe to conversation events
+      client.subscriptions.add(event.conversationId);
+
+      // Create user message and trigger agent
+      const conv = conversationService.getConversationById(event.conversationId);
+      if (!conv) {
+        sendToClient(ws, { type: 'error', conversationId: event.conversationId, error: 'Conversation not found' });
+        break;
+      }
+
+      const msg = messageService.createMessage(event.conversationId, 'user', event.content);
+      const workspace = workspaceService.getWorkspaceById(conv.workspace_id);
+      const queue = getConversationQueue();
+
+      if (queue && workspace) {
+        queue.enqueue({
+          conversationId: event.conversationId,
+          workspaceId: conv.workspace_id,
+          workspaceFolder: workspace.path,
+          content: event.content,
+          sessionId: conv.session_id || undefined,
+          images: event.images,
+        }).catch(err => logger.error({ err }, 'WS message enqueue error'));
       }
       break;
+    }
+
+    case 'interrupt': {
+      client.subscriptions.add(event.conversationId);
+      const queue = getConversationQueue();
+      queue?.interrupt(event.conversationId);
+      break;
+    }
+
+    case 'drain': {
+      client.subscriptions.add(event.conversationId);
+      const queue = getConversationQueue();
+      queue?.drain(event.conversationId);
+      break;
+    }
+
+    case 'close': {
+      client.subscriptions.add(event.conversationId);
+      const queue = getConversationQueue();
+      queue?.close(event.conversationId);
+      break;
+    }
   }
 }
 
