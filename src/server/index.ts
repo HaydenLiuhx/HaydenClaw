@@ -6,6 +6,7 @@ import { createLogger, setLogger } from './logger.js';
 import { initDb } from './db/index.js';
 import { setupWebSocket } from './ws/index.js';
 import { initAgentPipeline } from './agent/singleton.js';
+import { initFeishu, stopFeishu } from './feishu/index.js';
 
 // Routes
 import healthRoutes from './routes/health.js';
@@ -30,6 +31,19 @@ logger.info(
   { mode: config.agentMode, maxConcurrent: config.maxConcurrentAgents },
   'Agent pipeline initialized'
 );
+
+// Initialize Feishu (if configured)
+if (config.feishuAppId && config.feishuAppSecret) {
+  const feishuClient = initFeishu(
+    { appId: config.feishuAppId, appSecret: config.feishuAppSecret },
+    null // default workspace will be resolved dynamically
+  );
+  if (feishuClient) {
+    logger.info('Feishu integration enabled');
+  }
+} else {
+  logger.info('Feishu not configured, skipping');
+}
 
 // Create Hono app
 const app = new Hono();
@@ -67,12 +81,14 @@ setupWebSocket(server as any);
 process.on('SIGTERM', () => {
   logger.info('SIGTERM received, shutting down...');
   agentManager.killAll();
+  stopFeishu();
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
   logger.info('SIGINT received, shutting down...');
   agentManager.killAll();
+  stopFeishu();
   process.exit(0);
 });
 

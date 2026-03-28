@@ -6,6 +6,8 @@ import { getLogger } from '../logger.js';
 import * as conversationService from '../services/conversation.js';
 import * as messageService from '../services/message.js';
 import { broadcastStreamEvent, broadcastMessageComplete, broadcastError } from '../ws/index.js';
+import { getFeishuClient } from '../feishu/index.js';
+import { onFeishuStreamEvent, onFeishuComplete, onFeishuError, hasActiveCard } from '../feishu/handler.js';
 import type { ContainerOutput, StreamEvent, ImageAttachment } from '../../shared/types.js';
 
 interface QueueItem {
@@ -119,6 +121,12 @@ export class ConversationQueue extends EventEmitter {
     if (output.streamEvent) {
       broadcastStreamEvent(conversationId, output.streamEvent);
 
+      // Forward to Feishu card if applicable
+      const feishuClient = getFeishuClient();
+      if (feishuClient && hasActiveCard(conversationId)) {
+        onFeishuStreamEvent(feishuClient, conversationId, output.streamEvent).catch(() => {});
+      }
+
       // Accumulate text for final message storage
       if (output.streamEvent.type === 'text_delta') {
         state.accumulatedText += output.streamEvent.text;
@@ -162,6 +170,16 @@ export class ConversationQueue extends EventEmitter {
 
     if (isError) {
       broadcastError(conversationId, `Agent exited with code ${code}`);
+    }
+
+    // Finalize Feishu card
+    const feishuClient = getFeishuClient();
+    if (feishuClient && hasActiveCard(conversationId)) {
+      if (isError) {
+        onFeishuError(feishuClient, conversationId, `Agent exited with code ${code}`).catch(() => {});
+      } else {
+        onFeishuComplete(feishuClient, conversationId).catch(() => {});
+      }
     }
 
     state.status = 'idle';
